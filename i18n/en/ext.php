@@ -41,9 +41,9 @@ return [
 		// Feed settings
 		'feed_setting_title' => 'Feed Digest',
 		'feed_setting_label' => 'Summarize articles with LLM',
-		'feed_setting_help' => 'Automatically summarize new articles from this feed and mark originals as read.',
+		'feed_setting_help' => 'Automatically summarize new articles from this feed and tag originals as summarized.',
 		'batch_size_label' => 'Articles per summary batch',
-		'batch_size_help' => 'When set to 1: Each article gets a translated copy with summary prepended, original is marked as read. When > 1: Creates a combined summary article and marks originals as read.',
+		'batch_size_help' => 'When set to 1: Each article gets a translated copy with summary prepended, original is tagged as summarized. When > 1: Creates a combined summary article and tags originals as summarized.',
 
 		// How it works
 		'how_it_works_title' => 'How It Works',
@@ -51,7 +51,7 @@ return [
 		'how_step2' => 'Unread articles are collected (up to the max articles limit) and sent to the LLM API in one batch.',
 		'how_step3' => 'The LLM summarizes each article and translates titles to your destination language.',
 		'how_step4' => 'A combined summary article is created and added to the feed.',
-		'how_step5' => 'Original articles are marked as read.',
-		'how_step6' => 'If any errors occur, articles remain unread and will be retried on the next update.',
+		'how_step5' => 'Original articles are tagged as summarized and remain unread.',
+		'how_step6' => 'If any errors occur, articles remain untagged and will be retried on the next update.',
 	],
 ];

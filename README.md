@@ -1,6 +1,6 @@
 # Feed Digest Extension for FreshRSS
 
-Automatically summarize newly retrieved RSS articles using LLM APIs (OpenAI-compatible). This extension processes articles during feed updates, creates combined summary articles in your destination language, and marks the originals as read.
+Automatically summarize newly retrieved RSS articles using LLM APIs (OpenAI-compatible). This extension processes articles during feed updates, creates combined summary articles in your destination language, and tags the originals as `已总结` while keeping them unread.
 
 ## Features
 
@@ -72,7 +72,7 @@ To enable summarization for a specific feed:
    - **Articles per summary batch**: Number of articles to include in each summary (1-50, default: 10)
      - Articles are processed in batches to avoid timeouts
      - Each batch creates one summary article
-     - Example: 35 unread articles with batch size 10 → 3 summary articles (10+10+10), 5 remain unread
+     - Example: 35 unread articles with batch size 10 → 3 summary articles (10+10+10), 30 originals tagged as `已总结`, 5 originals wait for the next batch; all originals remain unread
 5. Click **Submit**
 
 ## API Endpoint Examples
@@ -122,8 +122,8 @@ Key: sk-or-v1-...
    - Concise summaries (2-4 sentences each)
    - Links to original articles
    - Clean HTML formatting
-6. **Mark as Read**: Only successfully summarized articles are marked as read
-7. **Auto-retry**: Failed batches remain unread and will be retried on the next update
+6. **Tag as Summarized**: Only successfully summarized articles are tagged as `已总结`; original unread status is preserved
+7. **Auto-retry**: Failed batches remain untagged and will be retried on the next update
 
 ## PHP Timeout Configuration
 
@@ -224,7 +224,7 @@ To test the extension:
 2. Manually trigger feed update
 3. Check logs for processing messages
 4. Verify summary article appears in feed
-5. Confirm original articles marked as read
+5. Confirm original articles remain unread and have the `已总结` tag
 
 ### Debugging
 

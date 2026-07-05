@@ -156,7 +156,7 @@ $maxContentLength = $config['max_content_length'] ?? 4000;
 		<li><?= _t('ext.feed_digest.how_step2', 'Unread articles are collected (up to the max articles limit) and sent to the LLM API in one batch.') ?></li>
 		<li><?= _t('ext.feed_digest.how_step3', 'The LLM summarizes each article and translates titles to your destination language.') ?></li>
 		<li><?= _t('ext.feed_digest.how_step4', 'A combined summary article is created and added to the feed.') ?></li>
-		<li><?= _t('ext.feed_digest.how_step5', 'Original articles are marked as read.') ?></li>
-		<li><?= _t('ext.feed_digest.how_step6', 'If any errors occur, articles remain unread and will be retried on the next update.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step5', 'Original articles are tagged as summarized and remain unread.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step6', 'If any errors occur, articles remain untagged and will be retried on the next update.') ?></li>
 	</ol>
 </div>

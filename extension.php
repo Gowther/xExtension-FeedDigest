@@ -5,9 +5,10 @@ declare(strict_types=1);
  * Feed Digest Extension
  *
  * Automatically summarizes newly retrieved RSS articles using LLM APIs (OpenAI-compatible).
- * Processes articles during feed updates, creates combined summary articles, and marks originals as read.
+ * Processes articles during feed updates, creates combined summary articles, and tags originals as summarized.
  */
 final class FeedDigestExtension extends Minz_Extension {
+	private const PROCESSED_TAG_NAME = '已总结';
 
 	/**
 	 * Initialize the extension and register hooks
@@ -116,7 +117,7 @@ final class FeedDigestExtension extends Minz_Extension {
 	}
 
 	/**
-	 * Process a single feed: get unread articles, summarize in batches, and mark as read
+	 * Process a single feed: get unread articles, summarize in batches, and tag originals as summarized
 	 */
 	private function processFeed(FreshRSS_Feed $feed, string $apiEndpoint, string $secretKey,
 	                             string $model, string $destLanguage, int $maxContentLength): void {
@@ -193,7 +194,7 @@ final class FeedDigestExtension extends Minz_Extension {
 			// Check if we have enough articles to process at least one batch
 			if ($totalWorthy < $batchSize) {
 				Minz_Log::warning("Feed Digest: Skipping {$feed->name()} - only {$totalWorthy} articles worth summarizing (batch size: {$batchSize})");
-				return; // Don't mark as read, wait for more articles
+				return; // Wait for more articles before tagging them as summarized
 			}
 
 			// Process in batches
@@ -223,18 +224,18 @@ final class FeedDigestExtension extends Minz_Extension {
 				} catch (Exception $e) {
 					Minz_Log::error("Feed Digest: Batch #{$batchNumber} failed for {$feed->name()}: " . $e->getMessage());
 					// This batch failed, but continue with next batch
-					// Failed articles stay unread and will be retried next time
+					// Failed articles stay untagged and will be retried next time
 				}
 			}
 
 			$remainingWorthy = count($worthSummarizing);
 			$totalRemaining = $remainingWorthy + $totalImageOnly;
 
-			Minz_Log::notice("Feed Digest: {$feed->name()} complete - processed {$totalProcessed} articles in {$batchNumber} batches, {$totalRemaining} left unread ({$remainingWorthy} waiting for batch, {$totalImageOnly} image-only)");
+			Minz_Log::notice("Feed Digest: {$feed->name()} complete - tagged {$totalProcessed} summarized articles in {$batchNumber} batches, {$totalRemaining} left unread ({$remainingWorthy} waiting for batch, {$totalImageOnly} image-only)");
 
 		} catch (Exception $e) {
 			Minz_Log::error("Feed Digest error for feed {$feed->name()}: " . $e->getMessage());
-			// Articles stay unread - will retry next time
+			// Articles stay untagged - will retry next time
 		}
 	}
 
@@ -261,9 +262,87 @@ final class FeedDigestExtension extends Minz_Extension {
 	 * Check if an article was already processed by Feed Digest
 	 */
 	private function isAlreadyProcessed(FreshRSS_Entry $entry): bool {
+		if ($this->hasProcessedTag($entry)) {
+			return true;
+		}
+
 		$content = $entry->content();
-		// Check for any Feed Digest marker (summary box or skip note)
+		// Legacy marker for translated copies and skipped-article notes.
 		return strpos($content, 'Feed Digest') !== false;
+	}
+
+	/**
+	 * Check whether the original article already carries the Feed Digest processed label.
+	 */
+	private function hasProcessedTag(FreshRSS_Entry $entry): bool {
+		$entryId = (string)$entry->id();
+		if (!ctype_digit($entryId)) {
+			return false;
+		}
+
+		$tagDAO = FreshRSS_Factory::createTagDao();
+		foreach ($tagDAO->getTagsForEntry($entryId) as $tag) {
+			if (!empty($tag['checked']) && ($tag['name'] ?? '') === self::PROCESSED_TAG_NAME) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Add the summarized label to originals after a successful digest article was created.
+	 *
+	 * @param array<FreshRSS_Entry> $entries
+	 * @throws Exception
+	 */
+	private function markEntriesAsSummarized(array $entries): void {
+		if (count($entries) === 0) {
+			return;
+		}
+
+		$tagDAO = FreshRSS_Factory::createTagDao();
+		$tagId = $this->ensureProcessedTagId($tagDAO);
+		$labels = [];
+
+		foreach ($entries as $entry) {
+			$entryId = (string)$entry->id();
+			if (!ctype_digit($entryId)) {
+				continue;
+			}
+			$labels[] = [
+				'id_tag' => $tagId,
+				'id_entry' => $entryId,
+			];
+		}
+
+		if (count($labels) === 0) {
+			return;
+		}
+
+		if ($tagDAO->tagEntries($labels) === false) {
+			throw new Exception('Unable to tag summarized Feed Digest articles');
+		}
+	}
+
+	private function ensureProcessedTagId(FreshRSS_TagDAO $tagDAO): int {
+		$tag = $tagDAO->searchByName(self::PROCESSED_TAG_NAME);
+		if ($tag !== null) {
+			return $tag->id();
+		}
+
+		$tagId = $tagDAO->addTag(['name' => self::PROCESSED_TAG_NAME]);
+		if ($tagId !== false && $tagId > 0) {
+			return $tagId;
+		}
+
+		// Another process may have created the tag between search and insert.
+		$tag = $tagDAO->searchByName(self::PROCESSED_TAG_NAME);
+		if ($tag !== null) {
+			return $tag->id();
+		}
+
+		throw new Exception('Unable to create Feed Digest summarized tag');
 	}
 
 	/**
@@ -433,8 +512,6 @@ final class FeedDigestExtension extends Minz_Extension {
 	 */
 	private function processTranslation(FreshRSS_Feed $feed, array $entries, string $apiEndpoint,
 	                                    string $secretKey, string $model, string $destLanguage): void {
-		$entryDAO = FreshRSS_Factory::createEntryDao();
-
 		// Build translation system prompt
 		$feedTitle = htmlspecialchars($feed->name(), ENT_QUOTES, 'UTF-8');
 		$feedDesc = htmlspecialchars($feed->description(), ENT_QUOTES, 'UTF-8');
@@ -497,9 +574,7 @@ PROMPT;
 
 		$this->createTranslatedArticle($feed, $entry, $result);
 
-		// Mark originals as read
-		$entryIds = array_map(fn($entry) => $entry->id(), $entries);
-		$entryDAO->markRead($entryIds, true);
+		$this->markEntriesAsSummarized($entries);
 	}
 
 	/**
@@ -510,8 +585,6 @@ PROMPT;
 	private function processSummary(FreshRSS_Feed $feed, array $entries, string $apiEndpoint,
 	                                string $secretKey, string $model, string $destLanguage,
 	                                int $maxContentLength): void {
-		$entryDAO = FreshRSS_Factory::createEntryDao();
-
 		// Build summary system prompt
 		$feedTitle = htmlspecialchars($feed->name(), ENT_QUOTES, 'UTF-8');
 		$feedDesc = htmlspecialchars($feed->description(), ENT_QUOTES, 'UTF-8');
@@ -559,9 +632,7 @@ PROMPT;
 		// Create combined summary article
 		$this->createSummaryArticle($feed, $entries, $summaries);
 
-		// Mark originals as read
-		$entryIds = array_map(fn($entry) => $entry->id(), $entries);
-		$entryDAO->markRead($entryIds, true);
+		$this->markEntriesAsSummarized($entries);
 	}
 
 	/**
