@@ -734,7 +734,7 @@ PROMPT;
 	/**
 	 * Create a new translated article (for translate-only mode / batch_size=1)
 	 *
-	 * Creates a new feed item with the summary and translated content,
+	 * Creates a new feed item with the summary, translated content, and original content,
 	 * preserving the original article's metadata.
 	 *
 	 * @param FreshRSS_Feed $feed The feed
@@ -752,13 +752,18 @@ PROMPT;
 		            . '<strong>Feed Digest Summary:</strong> ' . $summaryText
 		            . '</div><br /><br />';
 
+		$originalSection = '<hr /><h2>Original Article</h2>'
+		                 . '<div class="original-content">' . $originalEntry->content() . '</div>';
+
 		// Determine the article content
 		if ($translatedContent !== null) {
-			// Article was translated - use translated content
-			$content = $summaryBox . '<div class="translated-content">' . nl2br(htmlspecialchars($translatedContent, ENT_QUOTES, 'UTF-8')) . '</div>';
+			// Article was translated - show translation first, then original for comparison.
+			$translatedSection = '<h2>Translated Article</h2>'
+			                   . '<div class="translated-content">' . nl2br(htmlspecialchars($translatedContent, ENT_QUOTES, 'UTF-8')) . '</div>';
+			$content = $summaryBox . $translatedSection . $originalSection;
 		} else {
-			// Article was already in dest language - keep original content
-			$content = $summaryBox . $originalEntry->content();
+			// Article was already in dest language - keep the original content without duplicating it.
+			$content = $summaryBox . $originalSection;
 		}
 
 		// Use original article's date but generate unique ID

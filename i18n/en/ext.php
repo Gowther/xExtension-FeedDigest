@@ -43,7 +43,7 @@ return [
 		'feed_setting_label' => 'Summarize articles with LLM',
 		'feed_setting_help' => 'Automatically summarize new articles from this feed and tag originals as summarized.',
 		'batch_size_label' => 'Articles per summary batch',
-		'batch_size_help' => 'When set to 1: Each article gets a translated copy with summary prepended, original is tagged as summarized. When > 1: Creates a combined summary article and tags originals as summarized.',
+		'batch_size_help' => 'When set to 1: Each article gets one LLM call and a new article containing summary, translation, and original text. When > 1: Creates a combined summary article and tags originals as summarized.',
 
 		// How it works
 		'how_it_works_title' => 'How It Works',

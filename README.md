@@ -71,7 +71,8 @@ To enable summarization for a specific feed:
    - **Summarize articles with LLM**: Set to **Yes**
    - **Articles per summary batch**: Number of articles to include in each summary (1-50, default: 10)
      - Articles are processed in batches to avoid timeouts
-     - Each batch creates one summary article
+     - Batch size 1 creates one article per original with summary, translated text, and original text using a single LLM call
+     - Batch size greater than 1 creates one combined summary article per batch
      - Example: 35 unread articles with batch size 10 → 3 summary articles (10+10+10), 30 originals tagged as `已总结`, 5 originals wait for the next batch; all originals remain unread
 5. Click **Submit**
 
