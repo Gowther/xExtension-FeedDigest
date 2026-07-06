@@ -303,26 +303,26 @@ final class FeedDigestExtension extends Minz_Extension {
 
 		$tagDAO = FreshRSS_Factory::createTagDao();
 		$tagId = $this->ensureProcessedTagId($tagDAO);
-		$labels = [];
+		$taggedCount = 0;
 
 		foreach ($entries as $entry) {
 			$entryId = (string)$entry->id();
 			if (!ctype_digit($entryId)) {
+				Minz_Log::warning("Feed Digest: Cannot tag summarized article with invalid entry id: {$entryId}");
 				continue;
 			}
-			$labels[] = [
-				'id_tag' => $tagId,
-				'id_entry' => $entryId,
-			];
+
+			if (!$tagDAO->tagEntry($tagId, $entryId)) {
+				throw new Exception("Unable to tag summarized Feed Digest article {$entryId}");
+			}
+			$taggedCount++;
 		}
 
-		if (count($labels) === 0) {
-			return;
+		if ($taggedCount === 0) {
+			throw new Exception('Unable to tag summarized Feed Digest articles: no valid original entry IDs');
 		}
 
-		if ($tagDAO->tagEntries($labels) === false) {
-			throw new Exception('Unable to tag summarized Feed Digest articles');
-		}
+		Minz_Log::notice("Feed Digest: Tagged {$taggedCount} original articles as " . self::PROCESSED_TAG_NAME);
 	}
 
 	private function ensureProcessedTagId(FreshRSS_TagDAO $tagDAO): int {
@@ -333,6 +333,7 @@ final class FeedDigestExtension extends Minz_Extension {
 
 		$tagId = $tagDAO->addTag(['name' => self::PROCESSED_TAG_NAME]);
 		if ($tagId !== false && $tagId > 0) {
+			Minz_Log::notice('Feed Digest: Created summarized label ' . self::PROCESSED_TAG_NAME);
 			return $tagId;
 		}
 
@@ -766,8 +767,8 @@ PROMPT;
 			$content = $summaryBox . $originalSection;
 		}
 
-		// Use original article's date but generate unique ID
-		$timestamp = $originalEntry->date();
+		// Use original article's raw timestamp but generate unique ID
+		$timestamp = $originalEntry->date(true);
 		$guid = 'llm-translated-' . $originalEntry->id() . '-' . time();
 
 		// Prepare entry data
